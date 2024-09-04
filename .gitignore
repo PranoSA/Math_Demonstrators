@@ -34,3 +34,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+#ignore all nested dist folders
+**/dist/*
+
+#ignore all nested node_modules folders
+**/node_modules/*
+
+#ignore all nested dist folders in app
+/app/dist/*
+
+/app/**/dist/*
