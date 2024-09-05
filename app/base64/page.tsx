@@ -904,7 +904,7 @@ const Base64Demonstrator = () => {
             <h1> Final Base64 Characters</h1>
             <p>
               {/* Reduce segments to just the characters */}
-              {segments.reduce((acc, val) => acc + val, '')}
+              {segments.reduce((acc, val) => acc + val, '') + paddingEquals()}
             </p>
           </div>
         )}
@@ -1042,6 +1042,11 @@ const Base64Demonstrator = () => {
     setEncodingOrDecoding(e.target.value as 'encoding' | 'decoding');
   };
 
+  const paddingEquals = () => {
+    const padding_length = inputText.length % 3;
+    return '='.repeat(padding_length);
+  };
+
   return (
     <div className="p-20 flex flex-wrap flex-row">
       <div className="w-full flex flex-wrap flex-col">
@@ -1084,7 +1089,7 @@ const Base64Demonstrator = () => {
             </div>
             <div className="w-full flex-col flex flex-wrap mt-10">
               <label>Base64 Characters: </label>
-              {getBase64Characters(binaryOutput)}
+              <p> {getBase64Characters(binaryOutput)}</p>
             </div>
           </div>
         </div>
