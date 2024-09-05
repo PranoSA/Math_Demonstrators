@@ -308,6 +308,7 @@ const Base64Demonstrator = () => {
   >('utf-16');
 
   const [extraEncodingBits, setExtraEncodingBits] = useState<string>('');
+  const encodedTextRef = React.useRef<string>('');
 
   //Split into binary with text index information
   type TextInformation = {
@@ -880,6 +881,9 @@ const Base64Demonstrator = () => {
       segments.push(base64Chars[index]);
     }
 
+    encodedTextRef.current =
+      segments.reduce((acc, val) => acc + val, '') + paddingEquals();
+
     return (
       <div className="w-full flex flex-wrap flex-row">
         <div className="w-full flex flex-wrap flex-row">
@@ -1002,6 +1006,7 @@ const Base64Demonstrator = () => {
     if (trailing_equals) {
       extra_bits = trailing_equals[0].length * 2;
     }
+    encodedTextRef.current = actual_encoding_text;
     setExtraEncodingBits(encoding_bits.slice(extra_bits, encoding_bits.length));
 
     //setExtraEncodingBits(binary.slice(last_index, binary.length));
@@ -1040,6 +1045,11 @@ const Base64Demonstrator = () => {
 
   const handleSetDecodingMode = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setEncodingOrDecoding(e.target.value as 'encoding' | 'decoding');
+    if (e.target.value === 'decoding') {
+      //call
+      const new_encoded_text = getBase64Characters(binaryOutput);
+      setEncodedText(encodedTextRef.current);
+    }
   };
 
   const paddingEquals = () => {
@@ -1074,7 +1084,7 @@ const Base64Demonstrator = () => {
             <option value="utf-32">UTF-32</option>
           </select>
           <div className="w-full flex flex-wrap">
-            <div className="w-full flex flex-wrap">
+            <div className="w-full flex flex-wrap mt-10">
               <label>Binary Breakdown </label>
               <div className="w-full flex flex-wrap">
                 {getColoredText(inputText)}
@@ -1123,7 +1133,7 @@ const Base64Demonstrator = () => {
               </div>
               <div>{getUnderlinedBinary(binaryOutput)}</div>
             </div>
-            <div className="w-full flex flex-wrap">
+            <div className="w-full flex flex-wrap mt-10">
               <label>Binary Breakdown </label>
               <div className="w-full flex flex-wrap">
                 {getColoredText(inputText)}
