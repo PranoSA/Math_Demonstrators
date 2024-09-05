@@ -18,6 +18,7 @@ const Connect4 = () => {
   const ws = useRef<WebSocket | null>(null);
 
   const [winningMoves, setWinningMoves] = useState<number[][]>([]);
+  const [extraEncodingBits, setExtraEncodingBits] = useState<number[][]>([]);
 
   useEffect(() => {
     if (!isSinglePlayer) {

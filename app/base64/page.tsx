@@ -48,6 +48,7 @@ const createBinaryStringFromBase64 = (base64: string) => {
     binary_string += index.toString(2).padStart(6, '0');
   }
   console.log('binary_string', binary_string);
+  console.log('Length of binary_string', binary_string.length);
   return binary_string;
   //add 0s so the length is a multiple of 8
   //return binary_string.padEnd(Math.ceil(binary_string.length / 8) * 8, '0');
@@ -65,9 +66,16 @@ const convert_utf_value_to_utf_16 = (utf_value: number) => {
     //then we need to convert it to a surrogate pair
     // so we will subtract 0x10000 from the value
     if (utf_value > 0xffff) {
-      const high_surrogate = 0xd800 + (utf_value >> 10);
+      const high_surrogate = 0xd800 + ((utf_value - 0x10000) >> 10);
       const low_surrogate = 0xdc00 + (utf_value & 0x3ff);
-      return String.fromCodePoint(high_surrogate, low_surrogate);
+      const char = String.fromCodePoint(high_surrogate, low_surrogate);
+      console.log('char', char);
+      console.log(
+        'Surrogate Pair',
+        high_surrogate.toString(16),
+        low_surrogate.toString(16)
+      );
+      return char;
     }
   } catch {
     return '';
@@ -245,24 +253,27 @@ const convertBinaryUTF8ByteToChar = (binary: string) => {
       current_string_index += 24;
     }
     if (length === 4) {
-      let value = parseInt(current_byte, 2);
+      //turn first 4 bits to 0
+      let value = parseInt(current_byte, 2) & 0b00001111;
+
       current_byte = binary.slice(
         current_string_index + 8,
         current_string_index + 16
       );
-      value = (value << 6) | parseInt(current_byte, 2);
+      value = (value << 6) | (parseInt(current_byte, 2) & 0b00111111);
       current_byte = binary.slice(
         current_string_index + 16,
         current_string_index + 24
       );
-      value = (value << 6) | parseInt(current_byte, 2);
+      value = (value << 6) | (parseInt(current_byte, 2) & 0b00111111);
       current_byte = binary.slice(
         current_string_index + 24,
         current_string_index + 32
       );
-      value = (value << 6) | parseInt(current_byte, 2);
+      value = (value << 6) | (parseInt(current_byte, 2) & 0b00111111);
       chars += convert_utf_value_to_utf_16(value);
       current_string_index += 32;
+      console.log('value in hex', value.toString(16));
     }
     if (length > 4) {
       alert('Error: Invalid UTF-8 Byte');
@@ -301,6 +312,8 @@ const Base64Demonstrator = () => {
   const [decodingMode, setDecodingMode] = useState<
     'ascii' | 'utf-16' | 'utf-32' | 'utf-8'
   >('utf-16');
+
+  const [extraEncodingBits, setExtraEncodingBits] = useState<string>('');
 
   //Split into binary with text index information
   type TextInformation = {
@@ -892,13 +905,15 @@ const Base64Demonstrator = () => {
             </div>
           ))}
         </div>
-        <div className="w-full flex flex-wrap flex-col mt-10">
-          <h1> Final Base64 Characters</h1>
-          <p>
-            {/* Reduce segments to just the characters */}
-            {segments.reduce((acc, val) => acc + val, '')}
-          </p>
-        </div>
+        {encodingOrDecoding === 'encoding' && (
+          <div className="w-full flex flex-wrap flex-col mt-10">
+            <h1> Final Base64 Characters</h1>
+            <p>
+              {/* Reduce segments to just the characters */}
+              {segments.reduce((acc, val) => acc + val, '')}
+            </p>
+          </div>
+        )}
       </div>
     );
 
@@ -979,6 +994,13 @@ const Base64Demonstrator = () => {
   };
 
   useEffect(() => {
+    const binary = createBinaryStringFromBase64(encodedText);
+    //set extra encoding bits to the leftover after the last byte, so mod 8 length
+    const last_index = Math.floor(binary.length / 8) * 8;
+    console.log('last index', last_index);
+    console.log('Binary length', binary.length);
+    setExtraEncodingBits(binary.slice(last_index, binary.length));
+
     if (decodingMode === 'utf-16') {
       setInputText(convertInputStringToUtf16(encodedText));
       //directly set it using atob
@@ -1105,6 +1127,16 @@ const Base64Demonstrator = () => {
                   .replace(/\u0000/g, '\\u0000')
                   .replace(/ /g, '\u00A0')}
               </p>
+            </div>
+            {/* Extra Encoding Bits */}
+            <div className="w-full flex flex-wrap mt-10">
+              <div className="w-full flex flex-wrap">
+                <label>Extra Encoding Bits: </label>
+              </div>
+              <div className="w-full flex flex-wrap">
+                {' '}
+                <p> {extraEncodingBits} </p>
+              </div>
             </div>
           </div>
         </div>
