@@ -1,7 +1,7 @@
 'use client';
 
 import next from 'next';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 const colors = ['red', 'green', 'blue', 'orange', 'purple'];
 
@@ -34,6 +34,258 @@ const getBitLength = (char: string) => {
   return 8; // Default to 8 bits for safety
 };
 
+const convertBase64ToNumberByChar = (char: string) => {
+  const base64Chars =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  return base64Chars.indexOf(char);
+};
+
+// create a binary string from utf-16 string
+const createBinaryStringFromBase64 = (base64: string) => {
+  let binary_string = '';
+  for (let i = 0; i < base64.length; i++) {
+    const index = convertBase64ToNumberByChar(base64[i]);
+    binary_string += index.toString(2).padStart(6, '0');
+  }
+  console.log('binary_string', binary_string);
+  return binary_string;
+  //add 0s so the length is a multiple of 8
+  //return binary_string.padEnd(Math.ceil(binary_string.length / 8) * 8, '0');
+};
+
+const convert_utf_value_to_utf_16 = (utf_value: number) => {
+  //if value is over 2^16 - 1, then it is a surrogate pair
+  try {
+    //return a string from this function ressembling a char
+    if (utf_value <= 0xffff) {
+      return String.fromCodePoint(utf_value);
+    }
+
+    //if its a surrogate pair
+    //then we need to convert it to a surrogate pair
+    // so we will subtract 0x10000 from the value
+    if (utf_value > 0xffff) {
+      const high_surrogate = 0xd800 + (utf_value >> 10);
+      const low_surrogate = 0xdc00 + (utf_value & 0x3ff);
+      return String.fromCodePoint(high_surrogate, low_surrogate);
+    }
+  } catch {
+    return '';
+  }
+};
+
+//for utf-16 its simple, just use built in atob and btoa
+const convertInputStringToUtf16 = (binary: string) => {
+  //convert the string to binary
+  const actual_binary = createBinaryStringFromBase64(binary);
+
+  let chars = '';
+
+  let current_string_index = 0;
+
+  while (current_string_index < actual_binary.length - 15) {
+    //get the next 16 bits
+    const current_byte = actual_binary.slice(
+      current_string_index,
+      current_string_index + 16
+    );
+
+    //if greater than 2^16 - 1, its incorrect
+    if (current_byte.length !== 16) {
+      //alert('Error: Invalid UTF-16 Byte');
+    }
+
+    let value = parseInt(current_byte, 2);
+
+    if (value > 0xffff) {
+      //alert('Error: Invalid UTF-16 Byte');
+    }
+    //check if part of surrogate pair, or do I not have to?
+
+    chars += convert_utf_value_to_utf_16(value);
+
+    //jump forward 16 bits
+    current_string_index += 16;
+  }
+
+  return chars;
+};
+
+const convertASCIIByteToChar = (binary: string) => {
+  let current_string_index = 0;
+  let chars = '';
+  while (current_string_index < binary.length - 7) {
+    //get the next 8 bits
+    const current_byte = binary.slice(
+      current_string_index,
+      current_string_index + 8
+    );
+
+    console.log('current_byte', current_byte);
+
+    //if greater than 2^8 - 1, its incorrect
+    if (current_byte.length !== 8) {
+      //alert('Error: Invalid ASCII Byte');
+      //pad end with 0s
+      current_byte.padEnd(8, '0');
+      console.log('Why Are You Here??');
+    }
+
+    let value = parseInt(current_byte, 2);
+
+    if (value > 0xff) {
+      alert('Error: Invalid ASCII Byte');
+    }
+
+    chars += String.fromCharCode(value);
+
+    //jump forward 8 bits
+    current_string_index += 8;
+  }
+
+  //apend one last character if there is 8 bits left
+  /*if (current_string_index < binary.length) {
+    const current_byte = binary.slice(
+      current_string_index,
+      current_string_index + 8
+    );
+    let value = parseInt(current_byte, 2);
+    chars += String.fromCharCode(value);
+  }*/
+  return chars;
+};
+
+//utf-32 is simple, just convert the binary to a number and then use convert_utf_value_to_utf_16
+const convertBinaryUTF32ByteToChar = (binary: string) => {
+  let current_string_index = 0;
+  let chars = '';
+  while (current_string_index < binary.length - 7) {
+    //get the next 32 bits
+    const current_byte = binary.slice(
+      current_string_index,
+      current_string_index + 32
+    );
+
+    //if greater than 2^20 + 2^16, its incorrect
+    if (current_byte.length !== 32) {
+      alert('Error: Invalid UTF-32 Byte');
+    }
+
+    let value = parseInt(current_byte, 2);
+
+    if (value > 0x10ffff) {
+      alert('Error: Invalid UTF-32 Byte');
+    }
+
+    chars += convert_utf_value_to_utf_16(value);
+
+    //jump forward 32 bits
+    current_string_index += 32;
+  }
+
+  return chars;
+};
+
+//utf-8 is the worst
+const convertBinaryUTF8ByteToChar = (binary: string) => {
+  let current_string_index = 0;
+  const current_char_index = 0;
+  let chars = '';
+
+  while (current_string_index < binary.length - 7) {
+    //get the length in bytes of the current charater by counting numbers of 1s in the first byte
+    // if 0, then the length is 1
+    // if 110, then the length is 2
+    // if 1110, then the length is 3
+    // if 11110, then the length is 4
+
+    let length = 0;
+    let current_byte = binary.slice(
+      current_string_index,
+      current_string_index + 8
+    );
+    console.log('current_byte', current_byte);
+
+    //count the number of 1s in the first byte
+    while (current_byte[length] === '1') {
+      length++;
+    }
+    if (length === 0) {
+      length = 1;
+      let value = parseInt(current_byte, 2);
+      chars += String.fromCharCode(value);
+      current_string_index += 8;
+      console.log('chars', chars);
+    }
+
+    //get the next bytes
+    if (length === 2) {
+      let value = parseInt(current_byte, 2);
+      current_byte = binary.slice(
+        current_string_index + 8,
+        current_string_index + 16
+      );
+      value = (value << 6) | parseInt(current_byte, 2);
+      chars += String.fromCharCode(value);
+      current_string_index += 16;
+    }
+    if (length === 3) {
+      let value = parseInt(current_byte, 2);
+      current_byte = binary.slice(
+        current_string_index + 8,
+        current_string_index + 16
+      );
+      value = (value << 6) | parseInt(current_byte, 2);
+      current_byte = binary.slice(
+        current_string_index + 16,
+        current_string_index + 24
+      );
+      value = (value << 6) | parseInt(current_byte, 2);
+      chars += convert_utf_value_to_utf_16(value);
+      current_string_index += 24;
+    }
+    if (length === 4) {
+      let value = parseInt(current_byte, 2);
+      current_byte = binary.slice(
+        current_string_index + 8,
+        current_string_index + 16
+      );
+      value = (value << 6) | parseInt(current_byte, 2);
+      current_byte = binary.slice(
+        current_string_index + 16,
+        current_string_index + 24
+      );
+      value = (value << 6) | parseInt(current_byte, 2);
+      current_byte = binary.slice(
+        current_string_index + 24,
+        current_string_index + 32
+      );
+      value = (value << 6) | parseInt(current_byte, 2);
+      chars += convert_utf_value_to_utf_16(value);
+      current_string_index += 32;
+    }
+    if (length > 4) {
+      alert('Error: Invalid UTF-8 Byte');
+    }
+  }
+
+  //chgeck if current string index is passd the length of the binary string
+  //if it is , invalid chracter sequence
+  if (current_string_index > binary.length) {
+    return '';
+    // alert('Error: Invalid UTF-8 Byte');
+  }
+
+  //if there are remaining bits, imply the value
+  //of the character
+  console.log('Remaining bits', binary.slice(current_string_index));
+  //do not pad this value
+  let value = parseInt(binary.slice(current_string_index), 2);
+  //chars += String.fromCharCode(value);
+
+  return chars;
+};
+
 const Base64Demonstrator = () => {
   const [inputText, setInputText] = useState('');
   const [binaryOutput, setBinaryOutput] = useState('');
@@ -41,6 +293,10 @@ const Base64Demonstrator = () => {
   const [highlightedBase64, setHighlightedBase64] = useState<number | null>(
     null
   );
+  const [encodedText, setEncodedText] = useState('');
+  const [encodingOrDecoding, setEncodingOrDecoding] = useState<
+    'encoding' | 'decoding'
+  >('encoding');
 
   const [decodingMode, setDecodingMode] = useState<
     'ascii' | 'utf-16' | 'utf-32' | 'utf-8'
@@ -718,42 +974,141 @@ const Base64Demonstrator = () => {
     //setBase64Output(base64);
   };
 
+  const handleEncodedTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEncodedText(e.target.value);
+  };
+
+  useEffect(() => {
+    if (decodingMode === 'utf-16') {
+      setInputText(convertInputStringToUtf16(encodedText));
+      //directly set it using atob
+      //setInputText(convertInputStringToUtf16(e.target.value));
+      /* try {
+        const decodedString = atob(e.target.value);
+        setInputText(decodedString);
+      } catch {
+        setInputText('');
+      }
+        */
+    }
+    if (decodingMode === 'ascii') {
+      //create binary first
+      const binary = createBinaryStringFromBase64(encodedText);
+      //then pass it to the function
+      setInputText(convertASCIIByteToChar(binary));
+    }
+    if (decodingMode === 'utf-32') {
+      //create binary first
+      const binary = createBinaryStringFromBase64(encodedText);
+      //then pass it to the function
+      setInputText(convertBinaryUTF32ByteToChar(binary));
+    }
+    if (decodingMode === 'utf-8') {
+      //create binary first
+      const binary = createBinaryStringFromBase64(encodedText);
+      //then pass it to the function
+      setInputText(convertBinaryUTF8ByteToChar(binary));
+    }
+  }, [encodedText]);
+
+  const handleSetDecodingMode = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setEncodingOrDecoding(e.target.value as 'encoding' | 'decoding');
+  };
+
   return (
     <div className="p-20 flex flex-wrap flex-row">
       <div className="w-full flex flex-wrap flex-col">
-        <label>Input Text: </label>
-        <input type="text" value={inputText} onChange={handleInputChange} />
-        <label>Text Encoding: </label>
+        <label>Mode: </label>
         <select
-          value={decodingMode}
-          onChange={(e) => handleDecodingModeChange(e)}
+          value={encodingOrDecoding}
+          onChange={(e) => handleSetDecodingMode(e)}
         >
-          <option value="ascii">ASCII</option>
-          <option value="utf-8">UTF-8 (ASCII Compatible)</option>
-          <option value="utf-16">UTF-16</option>
-          <option value="utf-32">UTF-32</option>
+          <option value="encoding">Encoding</option>
+          <option value="decoding">Decoding</option>
         </select>
       </div>
-
-      <div className="w-full md:w-1/2 flex flex-wrap">
-        <div className="w-full flex flex-wrap">
-          <label>Binary Breakdown </label>
+      {encodingOrDecoding === 'encoding' ? (
+        <div className="w-full md:w-1/2 flex flex-wrap flex-col">
+          <label>Input Text: </label>
+          <input type="text" value={inputText} onChange={handleInputChange} />
+          <label>Text Encoding: </label>
+          <select
+            value={decodingMode}
+            onChange={(e) => handleDecodingModeChange(e)}
+          >
+            <option value="ascii">ASCII</option>
+            <option value="utf-8">UTF-8 (ASCII Compatible)</option>
+            <option value="utf-16">UTF-16</option>
+            <option value="utf-32">UTF-32</option>
+          </select>
           <div className="w-full flex flex-wrap">
-            {getColoredText(inputText)}
-          </div>
-        </div>
+            <div className="w-full flex flex-wrap">
+              <label>Binary Breakdown </label>
+              <div className="w-full flex flex-wrap">
+                {getColoredText(inputText)}
+              </div>
+            </div>
 
-        <div className="w-full flex-row  flex flex-wrap mt-10">
-          <div className="w-full flex-col flex flex-wrap">
-            <label>Underlined Binary Segments: </label>
+            <div className="w-full flex-row  flex flex-wrap mt-10">
+              <div className="w-full flex-col flex flex-wrap">
+                <label>Underlined Binary Segments: </label>
+              </div>
+              <div>{getUnderlinedBinary(binaryOutput)}</div>
+            </div>
+            <div className="w-full flex-col flex flex-wrap mt-10">
+              <label>Base64 Characters: </label>
+              {getBase64Characters(binaryOutput)}
+            </div>
           </div>
-          <div>{getUnderlinedBinary(binaryOutput)}</div>
         </div>
-        <div className="w-full flex-col flex flex-wrap mt-10">
-          <label>Base64 Characters: </label>
-          {getBase64Characters(binaryOutput)}
+      ) : (
+        <div className="w-full md:w-1/2 flex flex-wrap flex-col">
+          <label>Encoded Text: </label>
+          <input
+            type="text"
+            value={encodedText}
+            onChange={handleEncodedTextChange}
+          />
+          <label>Text Encoding: </label>
+          <select
+            value={decodingMode}
+            onChange={(e) => handleDecodingModeChange(e)}
+          >
+            <option value="ascii">ASCII</option>
+            <option value="utf-8">UTF-8 (ASCII Compatible)</option>
+            <option value="utf-16">UTF-16</option>
+            <option value="utf-32">UTF-32</option>
+          </select>
+
+          <div className="w-full  flex flex-wrap">
+            <div className="w-full flex-col flex flex-wrap mt-10">
+              <label>Base64 Characters: </label>
+              {getBase64Characters(binaryOutput)}
+            </div>
+            <div className="w-full flex-row  flex flex-wrap mt-10">
+              <div className="w-full flex-col flex flex-wrap">
+                <label>Underlined Binary Segments: </label>
+              </div>
+              <div>{getUnderlinedBinary(binaryOutput)}</div>
+            </div>
+            <div className="w-full flex flex-wrap">
+              <label>Binary Breakdown </label>
+              <div className="w-full flex flex-wrap">
+                {getColoredText(inputText)}
+              </div>
+            </div>
+            <div className="w-full flex flex-wrap flex-col mt-10">
+              {/* show the inputText, not as an input */}
+              <h1> Output Final Characters</h1>
+              <p>
+                {inputText
+                  .replace(/\u0000/g, '\\u0000')
+                  .replace(/ /g, '\u00A0')}
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
       <div className="w-full md:w-1/2 flex flex-wrap">{base64Table}</div>
     </div>
   );
