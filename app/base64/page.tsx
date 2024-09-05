@@ -723,13 +723,13 @@ const Base64Demonstrator = () => {
       <div className="w-full flex flex-wrap flex-col">
         <label>Input Text: </label>
         <input type="text" value={inputText} onChange={handleInputChange} />
-        <label>Decoding Mode: </label>
+        <label>Text Encoding: </label>
         <select
           value={decodingMode}
           onChange={(e) => handleDecodingModeChange(e)}
         >
           <option value="ascii">ASCII</option>
-          <option value="utf-8">UTF-8</option>
+          <option value="utf-8">UTF-8 (ASCII Compatible)</option>
           <option value="utf-16">UTF-16</option>
           <option value="utf-32">UTF-32</option>
         </select>
