@@ -69,12 +69,6 @@ const convert_utf_value_to_utf_16 = (utf_value: number) => {
       const high_surrogate = 0xd800 + ((utf_value - 0x10000) >> 10);
       const low_surrogate = 0xdc00 + (utf_value & 0x3ff);
       const char = String.fromCodePoint(high_surrogate, low_surrogate);
-      console.log('char', char);
-      console.log(
-        'Surrogate Pair',
-        high_surrogate.toString(16),
-        low_surrogate.toString(16)
-      );
       return char;
     }
   } catch {
@@ -228,27 +222,27 @@ const convertBinaryUTF8ByteToChar = (binary: string) => {
 
     //get the next bytes
     if (length === 2) {
-      let value = parseInt(current_byte, 2);
+      let value = parseInt(current_byte, 2) & 0b00011111;
       current_byte = binary.slice(
         current_string_index + 8,
         current_string_index + 16
       );
-      value = (value << 6) | parseInt(current_byte, 2);
+      value = (value << 6) | (parseInt(current_byte, 2) & 0b00111111);
       chars += String.fromCharCode(value);
       current_string_index += 16;
     }
     if (length === 3) {
-      let value = parseInt(current_byte, 2);
+      let value = parseInt(current_byte, 2) & 0b00001111;
       current_byte = binary.slice(
         current_string_index + 8,
         current_string_index + 16
       );
-      value = (value << 6) | parseInt(current_byte, 2);
+      value = (value << 6) | (parseInt(current_byte, 2) & 0b00111111);
       current_byte = binary.slice(
         current_string_index + 16,
         current_string_index + 24
       );
-      value = (value << 6) | parseInt(current_byte, 2);
+      value = (value << 6) | (parseInt(current_byte, 2) & 0b00111111);
       chars += convert_utf_value_to_utf_16(value);
       current_string_index += 24;
     }
@@ -994,15 +988,26 @@ const Base64Demonstrator = () => {
   };
 
   useEffect(() => {
-    const binary = createBinaryStringFromBase64(encodedText);
+    //deal with trailing equals
+    const trailing_equals = encodedText.match(/=+$/);
+    const actual_encoding_text = encodedText.replace(/=+$/, '');
+
+    const binary = createBinaryStringFromBase64(actual_encoding_text);
     //set extra encoding bits to the leftover after the last byte, so mod 8 length
     const last_index = Math.floor(binary.length / 8) * 8;
-    console.log('last index', last_index);
-    console.log('Binary length', binary.length);
-    setExtraEncodingBits(binary.slice(last_index, binary.length));
+
+    const encoding_bits = binary.slice(last_index, binary.length);
+    //for each =, subtract 2 bits
+    let extra_bits = 0;
+    if (trailing_equals) {
+      extra_bits = trailing_equals[0].length * 2;
+    }
+    setExtraEncodingBits(encoding_bits.slice(extra_bits, encoding_bits.length));
+
+    //setExtraEncodingBits(binary.slice(last_index, binary.length));
 
     if (decodingMode === 'utf-16') {
-      setInputText(convertInputStringToUtf16(encodedText));
+      setInputText(convertInputStringToUtf16(actual_encoding_text));
       //directly set it using atob
       //setInputText(convertInputStringToUtf16(e.target.value));
       /* try {
@@ -1015,19 +1020,19 @@ const Base64Demonstrator = () => {
     }
     if (decodingMode === 'ascii') {
       //create binary first
-      const binary = createBinaryStringFromBase64(encodedText);
+      const binary = createBinaryStringFromBase64(actual_encoding_text);
       //then pass it to the function
       setInputText(convertASCIIByteToChar(binary));
     }
     if (decodingMode === 'utf-32') {
       //create binary first
-      const binary = createBinaryStringFromBase64(encodedText);
+      const binary = createBinaryStringFromBase64(actual_encoding_text);
       //then pass it to the function
       setInputText(convertBinaryUTF32ByteToChar(binary));
     }
     if (decodingMode === 'utf-8') {
       //create binary first
-      const binary = createBinaryStringFromBase64(encodedText);
+      const binary = createBinaryStringFromBase64(actual_encoding_text);
       //then pass it to the function
       setInputText(convertBinaryUTF8ByteToChar(binary));
     }
