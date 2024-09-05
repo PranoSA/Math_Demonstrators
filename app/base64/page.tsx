@@ -860,7 +860,7 @@ const Base64Demonstrator = () => {
             marginTop: '-2px',
           }}
         >
-          {index + 1}. {parseInt(segment, 2)}]
+          {index + 1} . {parseInt(segment, 2)}
         </div>
       </div>
     ));
