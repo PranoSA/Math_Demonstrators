@@ -899,7 +899,7 @@ const Base64Demonstrator = () => {
           {segments.map((char, index) => (
             <div
               key={index}
-              className="w-1/3 md:w-1/4 flex flex-row flex-wrap justify-between pr-5"
+              className="w-1/3 md:w-1/4 flex flex-row flex-wrap justify-between pr-10"
               onClick={() => {
                 setHighlightedBase64(base64Chars.indexOf(char));
                 console.log(
