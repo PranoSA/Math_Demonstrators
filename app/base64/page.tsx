@@ -1114,7 +1114,7 @@ const Base64Demonstrator = () => {
               <div>{getUnderlinedBinary(binaryOutput)}</div>
             </div>
             <div className="w-full flex-col flex flex-wrap mt-10">
-              <label>Base64 Characters: </label>
+              <label>Base64 Characters (ascii / utf-8): </label>
               <p> {getBase64Characters(binaryOutput)}</p>
             </div>
           </div>
