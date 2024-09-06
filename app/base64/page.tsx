@@ -911,7 +911,7 @@ const Base64Demonstrator = () => {
               <div className="mr-2">
                 {index + 1}. {char}{' '}
               </div>
-              <div>
+              <div style={{ fontFamily: 'monospace', fontSize: '1.25 rem' }}>
                 {' '}
                 [{'00' + base64Chars.indexOf(char).toString(2).padStart(6, '0')}
                 ]{' '}
