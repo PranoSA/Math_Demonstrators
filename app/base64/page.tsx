@@ -1072,6 +1072,14 @@ const Base64Demonstrator = () => {
   };
 
   const paddingEquals = () => {
+    if (encodingOrDecoding === 'encoding' || true) {
+      //text information length
+      const text_information = textualInformationRef.current;
+      const length = text_information.length;
+      const leftover_bytes = (length * 8) % 6;
+      return '='.repeat(leftover_bytes % 3);
+    }
+
     const padding_length = inputText.length % 3;
     return '='.repeat(padding_length);
   };
