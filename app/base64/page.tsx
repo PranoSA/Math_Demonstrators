@@ -837,12 +837,11 @@ const Base64Demonstrator = () => {
           <span
             style={{
               color: 'black',
-              margin: '1px',
-              border: '2px solid black',
             }}
           >
             {' '}
-            00
+            {'_'}
+            {'_'}
           </span>
           {segment.split('').map((bit, bitIndex) => (
             <span
@@ -900,7 +899,7 @@ const Base64Demonstrator = () => {
           {segments.map((char, index) => (
             <div
               key={index}
-              className="w-1/4 md:w-1/6 flex-row flex-"
+              className="w-1/3 md:w-1/4 flex flex-row flex-wrap justify-between pr-5"
               onClick={() => {
                 setHighlightedBase64(base64Chars.indexOf(char));
                 console.log(
@@ -909,7 +908,14 @@ const Base64Demonstrator = () => {
                 );
               }}
             >
-              {index + 1}. {char}
+              <div className="mr-2">
+                {index + 1}. {char}{' '}
+              </div>
+              <div>
+                {' '}
+                [{'00' + base64Chars.indexOf(char).toString(2).padStart(6, '0')}
+                ]{' '}
+              </div>
             </div>
           ))}
         </div>
