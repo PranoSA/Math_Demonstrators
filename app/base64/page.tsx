@@ -834,6 +834,16 @@ const Base64Demonstrator = () => {
         onClick={() => setHighlightedBase64(parseInt(segment, 2))}
       >
         <div>
+          <span
+            style={{
+              color: 'black',
+              margin: '1px',
+              border: '2px solid black',
+            }}
+          >
+            {' '}
+            00
+          </span>
           {segment.split('').map((bit, bitIndex) => (
             <span
               key={bitIndex}
@@ -860,7 +870,7 @@ const Base64Demonstrator = () => {
             marginTop: '-2px',
           }}
         >
-          {index + 1}. {parseInt(segment, 2)}
+          {parseInt(segment, 2)}
         </div>
       </div>
     ));
