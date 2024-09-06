@@ -305,7 +305,7 @@ const Base64Demonstrator = () => {
 
   const [decodingMode, setDecodingMode] = useState<
     'ascii' | 'utf-16' | 'utf-32' | 'utf-8'
-  >('utf-16');
+  >('utf-8');
 
   const [extraEncodingBits, setExtraEncodingBits] = useState<string>('');
   const encodedTextRef = React.useRef<string>('');
@@ -911,10 +911,10 @@ const Base64Demonstrator = () => {
               <div className="mr-2">
                 {index + 1}. {char}{' '}
               </div>
-              <div style={{ fontFamily: 'monospace', fontSize: '1.25 rem' }}>
+              <div style={{ fontFamily: 'monospace', fontSize: '1.5 rem' }}>
                 {' '}
-                [{'00' + base64Chars.indexOf(char).toString(2).padStart(6, '0')}
-                ]{' '}
+                [{char.charCodeAt(0).toString(2).padStart(8, '0')}]-
+                {char.charCodeAt(0).toString(10)}{' '}
               </div>
             </div>
           ))}
