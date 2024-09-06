@@ -10,13 +10,18 @@
   },
   "dependencies": {
     "@types/d3": "^7.4.3",
+    "@types/gl-matrix": "^3.2.0",
     "d3": "^7.9.0",
+    "gl-matrix": "^3.4.3",
     "next": "14.2.7",
+    "p5": "^1.10.0",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "react-p5": "^1.4.1"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/p5": "^1.7.6",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "eslint": "^8",
