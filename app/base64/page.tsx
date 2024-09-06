@@ -899,7 +899,7 @@ const Base64Demonstrator = () => {
           {segments.map((char, index) => (
             <div
               key={index}
-              className="w-1/3 md:w-1/4 flex flex-row flex-wrap justify-between pr-10"
+              className="w-1/4 xl:w-1/5 flex flex-row flex-wrap justify-start"
               onClick={() => {
                 setHighlightedBase64(base64Chars.indexOf(char));
                 console.log(
@@ -908,10 +908,13 @@ const Base64Demonstrator = () => {
                 );
               }}
             >
-              <div className="mr-2">
+              <div className="w-full  ">
                 {index + 1}. {char}{' '}
               </div>
-              <div style={{ fontFamily: 'monospace', fontSize: '1.5 rem' }}>
+              <div
+                style={{ fontFamily: 'monospace', fontSize: '1.5 rem' }}
+                className="w-full  pr-5"
+              >
                 {' '}
                 [{char.charCodeAt(0).toString(2).padStart(8, '0')}]-
                 {char.charCodeAt(0).toString(10)}{' '}
@@ -1074,7 +1077,7 @@ const Base64Demonstrator = () => {
   };
 
   return (
-    <div className="p-20 flex flex-wrap flex-row">
+    <div className="p-10 flex flex-wrap flex-row">
       <div className="w-full flex flex-wrap flex-col">
         <label>Mode: </label>
         <select
