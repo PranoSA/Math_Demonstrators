@@ -14,14 +14,35 @@ type Obstacle = {
   size: number;
 };
 
+// Define the structure of a projectile
 type Projectile = {
-  x: number;
-  y: number;
   velocityX: number;
   velocityY: number;
-  type: 'rocket' | 'cannon' | 'zero-drag' | 'super-rocket';
+  positionX: number;
+  positionY: number;
+  velocityXNoDrag: number;
+  velocityYNoDrag: number;
+  positionXNoDrag: number;
+  positionYNoDrag: number;
+  velocityRocketX: number;
+  velocityRocketY: number;
+  rocketProjectileX: number;
+  rocketProjectileY: number;
+  pathWithDrag: number[][];
+  pathNoDrag: number[][];
+  pathRocket: number[][];
+  type?:
+    | 'rocket'
+    | 'cannon'
+    | 'super rocket'
+    | 'super cannon'
+    | 'cluster'
+    | 'super cluster'
+    | 'deep penetration'
+    | 'super deep penetration'
+    | 'super cluster deep penetration'
+    | 'air launched';
 };
-
 const ProjectileSimulation = () => {
   const [angle, setAngle] = useState(45);
   const [weight, setWeight] = useState(1000);
@@ -96,11 +117,21 @@ const ProjectileSimulation = () => {
 
     //add projectile
     projectiles.current.push({
-      x: positionX,
-      y: positionY,
       velocityX,
       velocityY,
-      type: 'cannon',
+      positionX,
+      positionY,
+      velocityXNoDrag,
+      velocityYNoDrag,
+      positionXNoDrag,
+      positionYNoDrag,
+      velocityRocketX,
+      velocityRocketY,
+      rocketProjectileX,
+      rocketProjectileY,
+      pathWithDrag,
+      pathNoDrag,
+      pathRocket,
     });
   };
 
@@ -125,6 +156,8 @@ const ProjectileSimulation = () => {
     if (p5.keyCode === p5.ENTER) {
       console.log('Launching from ENTER');
       setPlay(true);
+      //add projectile
+      initializeLaunch();
     }
     if (p5.keyCode === p5.SPACE) {
       setPlay(false);
@@ -142,6 +175,189 @@ const ProjectileSimulation = () => {
       resetSimulation();
       setPlay(true);
     }
+  };
+
+  const dt = 0.15; // Time step
+  const g = 9.81; // Gravity
+
+  const updateProjectiles = (p5: any) => {
+    projectiles.current.forEach((projectile) => {
+      // Calculate air resistance
+      const speed = Math.sqrt(
+        projectile.velocityX * projectile.velocityX +
+          projectile.velocityY * projectile.velocityY
+      );
+
+      const dragForce = 0.5 * density * speed * speed * dragCoefficient * area;
+
+      const angle_of_motion = Math.atan2(
+        projectile.velocityY,
+        projectile.velocityX
+      );
+
+      // Calculate drag forces
+      const dragForceX = dragForce * Math.cos(angle_of_motion);
+      const dragForceY = dragForce * Math.sin(angle_of_motion);
+
+      const rocket_angle_of_motion = Math.atan2(
+        projectile.velocityRocketY,
+        projectile.velocityRocketX
+      );
+
+      let rocket_power_x = 30 * Math.cos(rocket_angle_of_motion);
+      let rocket_power_y = 30 * Math.sin(rocket_angle_of_motion);
+
+      if (time_elapsed > 3) {
+        rocket_power_x = 0;
+        rocket_power_y = 0;
+      }
+
+      time_elapsed += dt;
+
+      const rocket_speed = Math.sqrt(
+        projectile.velocityRocketX * projectile.velocityRocketX +
+          projectile.velocityRocketY * projectile.velocityRocketY
+      );
+      const drag_rocket_force =
+        0.5 * density * rocket_speed * rocket_speed * dragCoefficient * area;
+      const drag_rocket_force_x =
+        drag_rocket_force * Math.cos(rocket_angle_of_motion);
+      const drag_rocket_force_y =
+        drag_rocket_force * Math.sin(rocket_angle_of_motion);
+
+      // Update velocities with drag
+      projectile.velocityX -= (dragForceX / weight) * dt;
+      projectile.velocityY -= (g + dragForceY / weight) * dt;
+
+      // Update positions with drag
+      projectile.positionX += projectile.velocityX * dt;
+      projectile.positionY += projectile.velocityY * dt; // Subtract because p5's y-axis is inverted
+
+      // Update positions without drag
+      projectile.velocityXNoDrag = projectile.velocityXNoDrag;
+      projectile.velocityYNoDrag -= g * dt;
+      projectile.positionXNoDrag += projectile.velocityXNoDrag * dt;
+      projectile.positionYNoDrag += projectile.velocityYNoDrag * dt; // Subtract because p5's y-axis is inverted
+
+      // Update velocity of the rocket
+      projectile.velocityRocketX +=
+        rocket_power_x * dt - (drag_rocket_force_x / weight) * dt;
+      projectile.velocityRocketY +=
+        rocket_power_y * dt - (g + drag_rocket_force_y / weight) * dt;
+
+      // Update the rocket position
+      projectile.rocketProjectileX += projectile.velocityRocketX * dt;
+      projectile.rocketProjectileY += projectile.velocityRocketY * dt;
+
+      // Store paths
+      projectile.pathWithDrag.push([
+        projectile.positionX,
+        projectile.positionY,
+      ]);
+      projectile.pathNoDrag.push([
+        projectile.positionXNoDrag,
+        projectile.positionYNoDrag,
+      ]);
+      projectile.pathRocket.push([
+        projectile.rocketProjectileX,
+        projectile.rocketProjectileY,
+      ]);
+
+      // Stop simulation if both projectile hits the ground
+      if (
+        projectile.positionY <= 0 &&
+        projectile.positionYNoDrag <= 0 &&
+        (projectile.rocketProjectileY <= 0 ||
+          projectile.rocketProjectileX >= 20000)
+      ) {
+        //setPlay(false);
+        //remove the projectile from the list
+        const index = projectiles.current.indexOf(projectile);
+        // don't mindleslly leave it out the preceeding projectile
+        const projectiles_before = projectiles.current.slice(0, index);
+        const projectiles_after = projectiles.current.slice(index + 1);
+        projectiles.current = [...projectiles_before, ...projectiles_after];
+      }
+
+      // Check for collision with obstacle
+      if (obstacle) {
+        const distToObstacle = Math.sqrt(
+          (projectile.positionX - obstacle.x) ** 2 +
+            (projectile.positionY - obstacle.y) ** 2
+        );
+        if (distToObstacle < obstacle.size / 2 + 10) {
+          // Bounce off the obstacle
+          projectile.velocityX = -projectile.velocityX;
+          projectile.velocityY = -projectile.velocityY;
+          alert('bounced off');
+        }
+      }
+
+      // Draw the projectile with drag if it is in the air
+      p5.fill(0);
+      if (projectile.positionX > 0 && projectile.positionY > 0) {
+        p5.circle(projectile.positionX, projectile.positionY, 200); // Adjust for scaling and larger size
+      }
+
+      // Draw the projectile without drag if it is in the air
+      p5.fill(255, 0, 0);
+      if (projectile.positionXNoDrag > 0 && projectile.positionYNoDrag > 0) {
+        p5.circle(projectile.positionXNoDrag, projectile.positionYNoDrag, 200); // Adjust for scaling and larger size
+      }
+
+      // Draw the rocket if it is in the air
+      p5.fill(0, 255, 0);
+      if (
+        projectile.rocketProjectileX > 0 &&
+        projectile.rocketProjectileY > 0
+      ) {
+        p5.circle(
+          projectile.rocketProjectileX,
+          projectile.rocketProjectileY,
+          200
+        ); // Adjust for scaling and larger size
+      }
+
+      // Draw paths
+      p5.stroke(0);
+      p5.strokeWeight(4);
+      p5.drawingContext.setLineDash([5, 5]); // Dotted line
+
+      // Draw path with drag
+      for (let i = 1; i < projectile.pathWithDrag.length; i++) {
+        p5.line(
+          projectile.pathWithDrag[i - 1][0],
+          projectile.pathWithDrag[i - 1][1],
+          projectile.pathWithDrag[i][0],
+          projectile.pathWithDrag[i][1]
+        );
+      }
+
+      p5.stroke(255, 0, 0);
+
+      // Draw path without drag
+      for (let i = 1; i < projectile.pathNoDrag.length; i++) {
+        p5.line(
+          projectile.pathNoDrag[i - 1][0],
+          projectile.pathNoDrag[i - 1][1],
+          projectile.pathNoDrag[i][0],
+          projectile.pathNoDrag[i][1]
+        );
+      }
+
+      // Draw path for the rocket
+      p5.stroke(0, 255, 0);
+      p5.strokeWeight(4);
+      p5.drawingContext.setLineDash([5, 5]); // Dotted line
+      for (let i = 1; i < projectile.pathRocket.length; i++) {
+        p5.line(
+          projectile.pathRocket[i - 1][0],
+          projectile.pathRocket[i - 1][1],
+          projectile.pathRocket[i][0],
+          projectile.pathRocket[i][1]
+        );
+      }
+    });
   };
 
   useEffect(() => {
@@ -313,6 +529,8 @@ const ProjectileSimulation = () => {
     }
     drawSpeedBar(p5);
     //now start the animation
+    updateProjectiles(p5);
+    return;
     if (play) {
       // start the projectile motion
       const dt = 0.15; // Time step
