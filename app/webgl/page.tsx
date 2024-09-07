@@ -1,250 +1,306 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
+import { useState, useEffect } from 'react';
 
-const TubeVisualization = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+// Dynamically import p5.js to avoid SSR issues
+const Sketch = dynamic(() => import('react-p5'), { ssr: false });
+
+type Obstacle = {
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  size: number;
+};
+
+const ProjectileSimulation = () => {
+  const [angle, setAngle] = useState(45);
+  const [weight, setWeight] = useState(1);
+  const [area, setArea] = useState(0.01);
+  const [initSpeed, setInitSpeed] = useState(100); // Increased initial speed
+  const [play, setPlay] = useState(false);
+  const [zoom, setZoom] = useState(0.5); // Adjusted zoom level
+  const [obstacle, setObstacle] = useState<null | Obstacle>(null); // State for obstacle
+
+  const density = 1.225; // kg/m^3 (air density at sea level)
+  const dragCoefficient = 0.47; // Approximate for a sphere
+
+  let velocityX = 0;
+  let velocityY = 0;
+  let positionX = 0;
+  let positionY = 0;
+
+  let velocityXNoDrag = 0;
+  let velocityYNoDrag = 0;
+  let positionXNoDrag = 0;
+  let positionYNoDrag = 0;
+
+  positionX = 50 + 50 * Math.cos((angle * Math.PI) / 180); // Starting position X at the end of the barrel
+  positionY = 50 - 50 * Math.sin((angle * Math.PI) / 180); // Starting position Y at the end of the barrel
+  positionXNoDrag = positionX;
+  positionYNoDrag = positionY;
+
+  let pathWithDrag: number[][] = [];
+  let pathNoDrag: number[][] = [];
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (play) {
+      // Generate a random obstacle when play is clicked
+      const obstacleX = Math.random() * 600 + 100;
+      const obstacleY = Math.random() * 400 + 100;
+      setObstacle({ x: obstacleX, y: obstacleY, size: 100 });
+    }
+  }, [play]);
 
-    const gl = canvas.getContext('webgl');
-    if (!gl) {
-      console.error('WebGL not supported');
-      return;
+  const setup = (
+    p5: {
+      createCanvas: (
+        arg0: number,
+        arg1: number
+      ) => { (): any; new (): any; parent: { (arg0: any): void; new (): any } };
+    },
+    canvasParentRef: any
+  ) => {
+    p5.createCanvas(800, 600).parent(canvasParentRef);
+    resetSimulation();
+  };
+
+  const drawGrid = (p5: {
+    stroke: (arg0: number) => void;
+    strokeWeight: (arg0: number) => void;
+    width: number;
+    line: (arg0: number, arg1: number, arg2: number, arg3: number) => void;
+    height: number;
+    text: (arg0: number, arg1: number, arg2: number) => void;
+  }) => {
+    p5.stroke(200);
+    p5.strokeWeight(1);
+    for (let x = 0; x <= p5.width; x += 50) {
+      p5.line(x, 0, x, p5.height);
+      p5.text(x, x + 5, 15);
+    }
+    for (let y = 0; y <= p5.height; y += 50) {
+      p5.line(0, y, p5.width, y);
+      p5.text(y, 5, y - 5);
+    }
+  };
+
+  const displayMouseCoordinates = (p5: any) => {
+    const x = p5.mouseX;
+    const y = p5.mouseY;
+    console.log('x: ', x, 'y: ', y);
+    p5.fill(0);
+    p5.noStroke();
+    p5.textSize(12);
+    p5.text(`(${x}, ${y})`, 10, p5.height - 10);
+    console.log('x: ', x, 'y: ', y);
+  };
+
+  const draw = (p5: any) => {
+    p5.background(255);
+    console.log('Drawing');
+    drawGrid(p5);
+    displayMouseCoordinates(p5);
+
+    // Translate to the bottom-left corner and apply zoom
+    p5.translate(0, p5.height);
+    p5.scale(zoom, -zoom); // Negative scale for y-axis to keep the origin at the bottom-left
+    drawGrid(p5);
+    // Draw the cannon
+    p5.push();
+    p5.translate(50, -p5.height + 50); // Move to the cannon's base position (adjusted for scaling)
+    p5.rotate(-angle * (Math.PI / 180)); // Rotate to the firing angle
+    p5.rect(0, -10, 50, 20); // Draw the cannon barrel
+    p5.pop();
+    displayMouseCoordinates(p5);
+
+    if (play) {
+      const dt = 0.03; // Time step
+      const g = 9.81; // Gravity
+      displayMouseCoordinates(p5);
+
+      // Calculate air resistance
+      const speed = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
+      const dragForce = 0.5 * density * speed * speed * dragCoefficient * area;
+      const dragForceX = (dragForce * velocityX) / speed;
+      const dragForceY = (dragForce * velocityY) / speed;
+
+      // Update velocities with drag
+      velocityX -= (dragForceX / weight) * dt;
+      velocityY -= (g + dragForceY / weight) * dt;
+
+      // Update positions with drag
+      positionX += velocityX * dt;
+      positionY -= velocityY * dt; // Subtract because p5's y-axis is inverted
+
+      // Update velocities without drag
+      velocityXNoDrag = velocityXNoDrag;
+      velocityYNoDrag -= g * dt;
+
+      // Update positions without drag
+      positionXNoDrag += velocityXNoDrag * dt;
+      positionYNoDrag -= velocityYNoDrag * dt; // Subtract because p5's y-axis is inverted
+
+      // Store paths
+      pathWithDrag.push([positionX, positionY]);
+      pathNoDrag.push([positionXNoDrag, positionYNoDrag]);
+
+      // Stop simulation if projectile hits the ground
+      if (positionY >= 550 || positionYNoDrag >= 550) {
+        setPlay(false);
+      }
+
+      // Check for collision with obstacle
+      if (obstacle) {
+        const distToObstacle = Math.sqrt(
+          (positionX - obstacle.x) ** 2 + (positionY - obstacle.y) ** 2
+        );
+        if (distToObstacle < obstacle.size / 2 + 10) {
+          // Bounce off the obstacle
+          velocityX = -velocityX;
+          velocityY = -velocityY;
+          alert('bounced off');
+        }
+      }
     }
 
-    // Set the viewport to match the canvas size
-    gl.viewport(0, 0, canvas.width, canvas.height);
+    // Draw the obstacle
+    if (obstacle) {
+      p5.fill(100);
+      p5.rect(
+        obstacle.x - obstacle.size / 2,
+        -obstacle.y - obstacle.size / 2,
+        obstacle.size,
+        obstacle.size
+      );
+    }
 
-    // Vertex shader program
-    const vsSource = `
-      attribute vec4 aVertexPosition;
-      attribute float aPressure;
-      varying float vPressure;
-      void main(void) {
-        gl_Position = aVertexPosition;
-        vPressure = aPressure;
-      }
-    `;
+    // Draw the projectile with drag
+    p5.fill(0);
+    p5.ellipse(positionX, -positionY, 20, 20); // Adjust for scaling and larger size
 
-    // Fragment shader program
-    const fsSource = `
-      precision mediump float;
-      varying float vPressure;
-      void main(void) {
-        float pressureRatio = vPressure / 10.0;
-        gl_FragColor = vec4(0.0, 0.0, pressureRatio, 1.0); // Corrected Blue gradient
-      }
-    `;
+    // Draw the projectile without drag
+    p5.fill(255, 0, 0);
+    p5.ellipse(positionXNoDrag, -positionYNoDrag, 20, 20); // Adjust for scaling and larger size
 
-    // Initialize a shader program; this is where all the lighting
-    // for the vertices and so forth is established.
-    const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+    // Draw paths
+    p5.stroke(0);
+    p5.strokeWeight(1);
+    p5.drawingContext.setLineDash([5, 5]); // Dotted line
 
-    // Collect all the info needed to use the shader program.
-    const programInfo = {
-      program: shaderProgram,
-      attribLocations: {
-        vertexPosition: gl.getAttribLocation(shaderProgram!, 'aVertexPosition'),
-        pressure: gl.getAttribLocation(shaderProgram!, 'aPressure'),
-      },
-    };
+    // Draw path with drag
+    for (let i = 1; i < pathWithDrag.length; i++) {
+      p5.line(
+        pathWithDrag[i - 1][0],
+        -pathWithDrag[i - 1][1],
+        pathWithDrag[i][0],
+        -pathWithDrag[i][1]
+      );
+    }
 
-    // Here's where we call the routine that builds all the
-    // objects we'll be drawing.
-    const buffers = initBuffers(gl);
+    p5.stroke(255, 0, 0);
+    p5.drawingContext.setLineDash([5, 5]); // Dotted line
 
-    // Draw the scene
-    drawScene(gl, programInfo, buffers);
-  }, []);
+    // Draw path without drag
+    for (let i = 1; i < pathNoDrag.length; i++) {
+      p5.line(
+        pathNoDrag[i - 1][0],
+        -pathNoDrag[i - 1][1],
+        pathNoDrag[i][0],
+        -pathNoDrag[i][1]
+      );
+    }
+  };
+
+  const resetSimulation = () => {
+    velocityX = initSpeed * Math.cos((angle * Math.PI) / 180);
+    velocityY = initSpeed * Math.sin((angle * Math.PI) / 180);
+    positionX = 50 + 50 * Math.cos((angle * Math.PI) / 180); // Starting position X at the end of the barrel
+    positionY = 550 - 50 * Math.sin((angle * Math.PI) / 180); // Starting position Y at the end of the barrel
+
+    velocityXNoDrag = velocityX;
+    velocityYNoDrag = velocityY;
+    positionXNoDrag = positionX;
+    positionYNoDrag = positionY;
+
+    pathWithDrag = [];
+    pathNoDrag = [];
+  };
 
   return (
-    <div style={{ backgroundColor: 'white', padding: '20px' }}>
-      <canvas
-        ref={canvasRef}
-        width="640"
-        height="480"
-        style={{ display: 'block', margin: '0 auto' }}
-      />
-      <div style={{ textAlign: 'center', marginTop: '20px' }}>
-        <div
-          style={{
-            display: 'inline-block',
-            width: '300px',
-            height: '20px',
-            background: 'linear-gradient(to right, lightblue, blue)',
-          }}
-        ></div>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            width: '300px',
-            margin: '0 auto',
-          }}
-        >
-          <span>0</span>
-          <span>10</span>
+    <div className="flex flex-col items-center space-y-4">
+      <div className="flex flex-col items-center space-y-2">
+        <label className="flex flex-col items-center">
+          Angle (degrees):
+          <input
+            type="number"
+            value={angle}
+            onChange={(e) => setAngle(Number(e.target.value))}
+            className="border rounded p-1"
+          />
+        </label>
+        <label className="flex flex-col items-center">
+          Weight (kg):
+          <input
+            type="number"
+            value={weight}
+            onChange={(e) => setWeight(Number(e.target.value))}
+            className="border rounded p-1"
+          />
+        </label>
+        <label className="flex flex-col items-center">
+          Cross-sectional Area (m^2):
+          <input
+            type="number"
+            value={area}
+            onChange={(e) => setArea(Number(e.target.value))}
+            className="border rounded p-1"
+          />
+        </label>
+        <label className="flex flex-col items-center">
+          Initial Speed (m/s):
+          <input
+            type="number"
+            value={initSpeed}
+            onChange={(e) => setInitSpeed(Number(e.target.value))}
+            className="border rounded p-1"
+          />
+        </label>
+        <label className="flex flex-col items-center">
+          Zoom:
+          <input
+            type="range"
+            min="0.1"
+            max="2"
+            step="0.1"
+            value={zoom}
+            onChange={(e) => setZoom(Number(e.target.value))}
+            className="w-full"
+          />
+        </label>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => {
+              resetSimulation();
+              setPlay(true);
+            }}
+            className="bg-blue-500 text-white px-4 py-2 rounded"
+          >
+            Play
+          </button>
+          <button
+            onClick={() => setPlay(false)}
+            className="bg-red-500 text-white px-4 py-2 rounded"
+          >
+            Pause
+          </button>
         </div>
       </div>
+      {/*@ts-ignore*/}
+      <Sketch setup={setup} draw={draw} />
     </div>
   );
 };
 
-// Initialize the buffers we'll need. For this demo, we just
-// have one object -- a simple two-dimensional tube.
-function initBuffers(gl: WebGLRenderingContext) {
-  // Create a buffer for the tube's positions.
-  const positionBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-  // Define the positions for the tube
-  const positions = [
-    // Inlet
-    -0.9, 0.5, -0.9, -0.5,
-    // Throat
-    -0.3, 0.2, -0.3, -0.2,
-    // Outlet
-    0.9, 0.5, 0.9, -0.5,
-  ];
-
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
-
-  // Create a buffer for the pressures.
-  const pressureBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, pressureBuffer);
-
-  // Define the pressures for the tube
-  const pressures = [
-    10.0,
-    10.0, // Inlet
-    2.0,
-    2.0, // Throat
-    10.0,
-    10.0, // Outlet
-  ];
-
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pressures), gl.STATIC_DRAW);
-
-  return {
-    position: positionBuffer,
-    pressure: pressureBuffer,
-  };
-}
-
-function drawScene(gl: WebGLRenderingContext, programInfo: any, buffers: any) {
-  // Clear the canvas before we start drawing on it.
-  gl.clearColor(1.0, 1.0, 1.0, 1.0); // Clear to white, fully opaque
-  gl.clear(gl.COLOR_BUFFER_BIT);
-
-  // Tell WebGL how to pull out the positions from the position
-  // buffer into the vertexPosition attribute.
-  {
-    const numComponents = 2; // pull out 2 values per iteration
-    const type = gl.FLOAT; // the data in the buffer is 32bit floats
-    const normalize = false; // don't normalize
-    const stride = 0; // how many bytes to get from one set of values to the next
-    // 0 = use type and numComponents above
-    const offset = 0; // how many bytes inside the buffer to start from
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
-    gl.vertexAttribPointer(
-      programInfo.attribLocations.vertexPosition,
-      numComponents,
-      type,
-      normalize,
-      stride,
-      offset
-    );
-    gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
-  }
-
-  // Tell WebGL how to pull out the pressures from the pressure
-  // buffer into the pressure attribute.
-  {
-    const numComponents = 1; // pull out 1 value per iteration
-    const type = gl.FLOAT; // the data in the buffer is 32bit floats
-    const normalize = false; // don't normalize
-    const stride = 0; // how many bytes to get from one set of values to the next
-    // 0 = use type and numComponents above
-    const offset = 0; // how many bytes inside the buffer to start from
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.pressure);
-    gl.vertexAttribPointer(
-      programInfo.attribLocations.pressure,
-      numComponents,
-      type,
-      normalize,
-      stride,
-      offset
-    );
-    gl.enableVertexAttribArray(programInfo.attribLocations.pressure);
-  }
-
-  // Tell WebGL to use our program when drawing
-  gl.useProgram(programInfo.program);
-
-  // Draw the tube
-  {
-    const offset = 0;
-    const vertexCount = 6;
-    gl.drawArrays(gl.TRIANGLE_STRIP, offset, vertexCount);
-  }
-}
-
-function initShaderProgram(
-  gl: WebGLRenderingContext,
-  vsSource: string,
-  fsSource: string
-) {
-  const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
-  const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
-
-  // Create the shader program
-  const shaderProgram = gl.createProgram();
-  if (!shaderProgram || !vertexShader || !fragmentShader) {
-    return null;
-  }
-
-  gl.attachShader(shaderProgram, vertexShader);
-  gl.attachShader(shaderProgram, fragmentShader);
-  gl.linkProgram(shaderProgram);
-
-  // If creating the shader program failed, alert
-  if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-    console.error(
-      'Unable to initialize the shader program: ' +
-        gl.getProgramInfoLog(shaderProgram)
-    );
-    return null;
-  }
-
-  return shaderProgram;
-}
-
-function loadShader(gl: WebGLRenderingContext, type: number, source: string) {
-  const shader = gl.createShader(type);
-
-  if (!shader) {
-    return null;
-  }
-
-  // Send the source to the shader object
-  gl.shaderSource(shader, source);
-
-  // Compile the shader program
-  gl.compileShader(shader);
-
-  // See if it compiled successfully
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    console.error(
-      'An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader)
-    );
-    gl.deleteShader(shader);
-    return null;
-  }
-
-  return shader;
-}
-
-export default TubeVisualization;
+export default ProjectileSimulation;
